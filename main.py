@@ -77,7 +77,7 @@ def build_config(overrides):
     for key, value in config.items():
         result[key] = convert_value(key, value)
 
-    result["api_key"] = "*****"
+    result["api_key"] = "****"
     return result
 
 
