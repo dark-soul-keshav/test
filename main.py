@@ -81,6 +81,7 @@ def build_config(overrides):
     return result
 
 
+@app.get("/")
 @app.get("/effective-config")
 def get_effective_config(
     set_: list[str] = Query(default=[], alias="set"),
