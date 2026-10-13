@@ -25,21 +25,30 @@ DEFAULTS = {
 }
 
 
-def as_bool(value):
+def normalize_key(key):
+    key = key.strip().lower()
+    if key == "num_workers":
+        return "workers"
+    return key
+
+
+def to_bool(value):
     if isinstance(value, bool):
         return value
-    return str(value).strip().lower() in ("true", "1", "yes", "on")
+    return str(value).strip().lower() in {
+        "true", "1", "yes", "on"
+    }
 
 
-def convert(key, value):
+def convert_value(key, value):
     if key in ("port", "workers"):
         return int(value)
     if key == "debug":
-        return as_bool(value)
+        return to_bool(value)
     return str(value)
 
 
-def effective_config(overrides):
+def build_config(overrides):
     config = DEFAULTS.copy()
 
     yaml_path = Path("config.development.yaml")
@@ -47,32 +56,33 @@ def effective_config(overrides):
         with yaml_path.open(encoding="utf-8") as f:
             config.update(yaml.safe_load(f) or {})
 
-    env_file = dotenv_values(".env")
-    for key, value in env_file.items():
-        if key and key.startswith("APP_") and value is not None:
-            config[key[4:].lower()] = value
+    for key, value in dotenv_values(".env").items():
+        if key and value is not None:
+            if key.startswith("APP_"):
+                config[normalize_key(key[4:])] = value
+            elif key == "NUM_WORKERS":
+                config["workers"] = value
 
     for key, value in os.environ.items():
         if key.startswith("APP_"):
-            config[key[4:].lower()] = value
+            config[normalize_key(key[4:])] = value
 
     for item in overrides:
         if "=" not in item:
             continue
         key, value = item.split("=", 1)
-        config[key] = value
+        config[normalize_key(key)] = value
 
     result = {}
     for key, value in config.items():
-        result[key] = convert(key, value)
+        result[key] = convert_value(key, value)
 
     result["api_key"] = "*****"
     return result
 
 
 @app.get("/effective-config")
-@app.get("/effective-configs")
 def get_effective_config(
-    set: list[str] = Query(default=[]),
+    set_: list[str] = Query(default=[], alias="set"),
 ):
-    return effective_config(set)
+    return build_config(set_)
